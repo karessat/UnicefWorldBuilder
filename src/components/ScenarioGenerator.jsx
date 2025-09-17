@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ChevronDown, Sparkles, RefreshCw, MapPin, Clock, FileText } from 'lucide-react';
-import { regionalInsights, regions } from '../data/regionalInsights';
+import { regions } from '../data/regionalInsights';
 import { timeFrameGuidance, timeFrames } from '../data/timeFrameGuidance';
 import { getAgeLabel } from '../data/ageContexts';
 import { generatePrompt, generateRegeneratePrompt, callClaudeAPI } from '../utils/apiService';
@@ -124,25 +124,6 @@ const ScenarioGenerator = () => {
             </div>
           </div>
 
-          {/* Display Regional Context */}
-          {selectedRegion && (
-            <div className="p-4 bg-indigo-50 rounded-lg">
-              <h4 className="font-medium text-indigo-900 mb-2">
-                {useExistingScenario ? `Young Visionaries Research for ${selectedRegion}:` : `Creating fresh scenario for ${selectedRegion}`}
-              </h4>
-              {useExistingScenario ? (
-                <div className="text-sm text-indigo-800 space-y-1">
-                  <p><strong>Theme:</strong> {regionalInsights[selectedRegion]?.theme}</p>
-                  <p><strong>Key Challenges:</strong> {regionalInsights[selectedRegion]?.currentChallenges}</p>
-                  <p><strong>Preferred Future:</strong> {regionalInsights[selectedRegion]?.preferredFuture}</p>
-                </div>
-              ) : (
-                <p className="text-sm text-indigo-800">
-                  AI will use its knowledge of {selectedRegion}'s educational system, culture, infrastructure, and socioeconomic context to create an authentic scenario.
-                </p>
-              )}
-            </div>
-          )}
 
           {/* Time Frame */}
           <div>
