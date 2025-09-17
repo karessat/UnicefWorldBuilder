@@ -3,8 +3,13 @@ import { globalScanHits } from '../data/globalScanHits';
 import { timeFrameGuidance } from '../data/timeFrameGuidance';
 import { getAgeContext } from '../data/ageContexts';
 import { getDemoScenario } from '../data/demoScenarios';
+import { getAllSafetyInstructions } from './safetyInstructions';
+import { sanitizeUserInput, validateInputSafety } from './inputSanitization';
 
 export const generatePrompt = (selectedRegion, timeFrame, learnerAge, useExistingScenario, customDirection) => {
+  // Sanitize user inputs before processing
+  const sanitizedCustomDirection = customDirection ? sanitizeUserInput(customDirection).sanitized : '';
+  
   const regional = regionalInsights[selectedRegion];
   const guidance = timeFrameGuidance[timeFrame];
   const ageContext = getAgeContext(learnerAge);
@@ -45,7 +50,9 @@ export const generatePrompt = (selectedRegion, timeFrame, learnerAge, useExistin
   const regionNames = characterNames[selectedRegion] || ['Alex', 'Sam', 'Jordan', 'Taylor', 'Casey', 'Riley'];
   const randomName = regionNames[Math.floor(Math.random() * regionNames.length)];
 
-  const prompt = `CREATIVITY & UNIQUENESS REQUIREMENT: This is generation #${randomSeed} at ${timestamp}. Create a COMPLETELY UNIQUE scenario that is different from any previous generation. Be creative, unexpected, and original!
+  const prompt = `${getAllSafetyInstructions()}
+
+CREATIVITY & UNIQUENESS REQUIREMENT: This is generation #${randomSeed} at ${timestamp}. Create a COMPLETELY UNIQUE scenario that is different from any previous generation. Be creative, unexpected, and original!
 
 MANDATORY REQUIREMENT: The main character in this scenario MUST be exactly ${learnerAge || 'a randomly chosen'} years old. Do NOT use age 15 or any other age. Use ${learnerAge || 'the chosen age'} throughout the entire scenario.
 
@@ -89,20 +96,52 @@ EDUCATIONAL CONTEXT FOR AGE ${learnerAge}:
 TIME FRAME GUIDANCE - ${guidance.novelty} (${timeFrame}):
 ${guidance.description}
 
+NOVELTY REQUIREMENTS FOR ${timeFrame}:
+${timeFrame === '2035' ? `
+- Use 3-4 scan hits that represent realistic near-term breakthroughs
+- Show incremental but meaningful changes to current educational systems
+- Include emerging technologies that are already in development
+- Focus on policy and infrastructure improvements that could realistically happen
+- Be optimistic but grounded in current technological trajectories
+` : timeFrame === '2045' ? `
+- Use 4-6 scan hits including some truly surprising developments
+- Include breakthrough technologies that seem hard to imagine today
+- Show significant social and educational paradigm shifts
+- Include "wild card" elements that push boundaries of possibility
+- Combine multiple innovations in unexpected ways
+- Create genuine "wow" moments that feel futuristic but believable
+` : `
+- Use 5-8 scan hits to create a genuinely transformed educational landscape
+- Include multiple breakthrough technologies that seem almost science fiction
+- Show radical social changes and completely new educational paradigms
+- Include genuine "wild card" elements and unexpected developments
+- Push the boundaries while keeping scenarios theoretically possible
+- Create scenarios that feel like windows into a completely transformed world
+- Be bold, imaginative, and genuinely surprising
+`}
+
 AVAILABLE EDUCATIONAL INNOVATIONS TO DRAW FROM:
-Select and weave in 3-5 of these possibilities that fit your scenario:
+MANDATORY: Select and weave in ${timeFrame === '2035' ? '3-4' : timeFrame === '2045' ? '4-6' : '5-8'} of these innovations that fit your scenario:
 
 ${selectedScanHits.map(hit => `• ${hit}`).join('\n')}
 
-CREATIVITY & VARIETY INSTRUCTIONS:
-- Create a UNIQUE story that hasn't been told before - avoid generic scenarios
-- Use unexpected plot twists, surprising discoveries, or unusual learning situations
+INNOVATION INTEGRATION REQUIREMENTS:
+- MUST use the specified number of scan hits as core elements of your scenario
+- Combine innovations in unexpected and creative ways
+- Show how multiple technologies/approaches work together
+- Make the innovations feel natural and integral to the story
+- Demonstrate the transformative impact of these educational changes
+- Be specific about how each innovation actually works in practice
+
+CREATIVITY & NOVELTY INSTRUCTIONS:
+- Create a genuinely SURPRISING story that pushes educational boundaries
+- Include breakthrough moments that feel truly futuristic for ${timeFrame}
+- Use unexpected plot twists and discoveries that showcase innovation
 - Make the scenario emotionally engaging and memorable
-- Include specific, vivid details that bring the story to life
-- Don't mention all innovations - select 3-5 that work well together for your specific scenario
-- Integrate them naturally into the story rather than listing them
-- Show how they work in practice through the character's experience
-- Focus on the human impact and learning outcomes, not just the technology
+- Include specific, vivid details that bring futuristic education to life
+- Show radical departures from today's educational norms
+- Focus on the transformative human impact of educational innovation
+- Create "wow" moments that demonstrate the power of future learning
 
 STIRDEEPER FOCUS INSTRUCTIONS:
 Focus deeply on just 2-3 STIRDEEPER categories (choose different ones than typical):
@@ -121,7 +160,7 @@ STORY STRUCTURE VARIETY:
 
 ${useExistingScenario ? `START WITH: Use the existing Young Visionaries scenario vision from ${selectedRegion} as your foundation, but project it forward to ${timeFrame} incorporating relevant innovations from the list above.` : `CREATE NEW: Generate a completely fresh scenario for ${selectedRegion} in ${timeFrame} using your knowledge of the region. Rely entirely on your understanding of ${selectedRegion}'s educational context, challenges, and opportunities.`}
 
-${customDirection ? `USER DIRECTION: ${customDirection}` : ''}
+${sanitizedCustomDirection ? `USER DIRECTION: ${sanitizedCustomDirection}` : ''}
 
 FINAL REMINDER: Your main character must be ${learnerAge ? `${learnerAge} years old` : 'the specific age you choose'} - verify this before writing.
 
@@ -183,6 +222,12 @@ const extractScenarioSetting = (scenario) => {
 };
 
 export const generateRegeneratePrompt = (selectedRegion, timeFrame, learnerAge, generatedScenario, feedback, useExistingScenario) => {
+  // Sanitize user feedback inputs before processing
+  const sanitizedFeedback = {
+    liked: feedback.liked ? sanitizeUserInput(feedback.liked).sanitized : '',
+    disliked: feedback.disliked ? sanitizeUserInput(feedback.disliked).sanitized : ''
+  };
+  
   const guidance = timeFrameGuidance[timeFrame];
   const regional = regionalInsights[selectedRegion];
   
@@ -215,7 +260,9 @@ export const generateRegeneratePrompt = (selectedRegion, timeFrame, learnerAge, 
   // Limit to 10-15 most relevant innovations to keep focused
   const selectedInnovations = relevantInnovations.slice(0, 15);
 
-  const prompt = `SCENARIO REFINEMENT REQUEST: Improve and enhance the existing scenario based on user feedback while preserving the core story elements.
+  const prompt = `${getAllSafetyInstructions()}
+
+SCENARIO REFINEMENT REQUEST: Improve and enhance the existing scenario based on user feedback while preserving the core story elements.
 
 REFINEMENT OBJECTIVE: Take the existing scenario and enhance it by addressing the user's specific feedback while maintaining the same character, setting, and basic storyline structure.
 
@@ -223,8 +270,8 @@ ORIGINAL SCENARIO TO REFINE:
 ${generatedScenario}
 
 USER FEEDBACK FOR IMPROVEMENT:
-What they liked: ${feedback.liked || 'No specific feedback provided'}
-What they want enhanced/added: ${feedback.disliked || 'No specific changes requested'}
+What they liked: ${sanitizedFeedback.liked || 'No specific feedback provided'}
+What they want enhanced/added: ${sanitizedFeedback.disliked || 'No specific changes requested'}
 
 MANDATORY PRESERVATION REQUIREMENTS:
 - Keep the same character: ${originalCharacterName || 'the original character'} (age ${learnerAge})
@@ -254,9 +301,16 @@ Use your knowledge of ${selectedRegion}'s educational, cultural, and socioeconom
 `}
 
 ENHANCEMENT OPPORTUNITIES:
-Based on the user feedback, consider incorporating these relevant educational innovations to address their concerns:
+Based on the user feedback, incorporate these relevant educational innovations to address their concerns while maintaining futuristic novelty:
 
 ${selectedInnovations.map(innovation => `• ${innovation}`).join('\n')}
+
+INNOVATION ENHANCEMENT REQUIREMENTS:
+- Add 2-3 additional scan hits that address the user's feedback
+- Maintain the futuristic, innovative feel of the original scenario
+- Show how new innovations enhance rather than replace existing elements
+- Demonstrate breakthrough approaches that feel genuinely advanced for ${timeFrame}
+- Keep the "wow" factor while addressing specific user requests
 
 SPECIFIC ENHANCEMENT GUIDELINES:
 - If user wants more "STIRDEEPER representation": Add more Social, Political, Environmental, or Economic dimensions
@@ -268,8 +322,8 @@ SPECIFIC ENHANCEMENT GUIDELINES:
 REFINED SCENARIO REQUIREMENTS:
 - Same character (${originalCharacterName || 'original character'}) at age ${learnerAge}
 - Same setting (${originalSetting || 'original setting'})
-- Enhanced based on feedback: "${feedback.disliked || 'general improvements'}"
-- Preserve what they liked: "${feedback.liked || 'existing elements'}"
+- Enhanced based on feedback: "${sanitizedFeedback.disliked || 'general improvements'}"
+- Preserve what they liked: "${sanitizedFeedback.liked || 'existing elements'}"
 - 250-300 words with richer detail and better alignment with user preferences
 - Maintain regional authenticity for ${selectedRegion}
 
