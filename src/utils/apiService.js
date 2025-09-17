@@ -17,6 +17,14 @@ const cleanScenarioContent = (scenario) => {
   cleaned = cleaned.replace(/^Title:\s*([^"\n]+)\s*/i, '$1\n\n');
   cleaned = cleaned.replace(/^["']([^"']+)["']\s*/m, '$1\n\n');
   
+  // Fix paragraph breaks in the middle of sentences
+  // Look for patterns like: "word\n\nword" where it should be "word word"
+  // But preserve intentional paragraph breaks (after periods, exclamation marks, etc.)
+  cleaned = cleaned.replace(/([a-z,;:])\n\n([a-z])/g, '$1 $2');
+  
+  // Fix single line breaks in the middle of sentences
+  cleaned = cleaned.replace(/([a-z,;:])\n([a-z])/g, '$1 $2');
+  
   // Remove various forms of innovations/technologies listing at the end
   cleaned = cleaned.replace(/\n*\[?Innovations used:.*$/is, '');
   cleaned = cleaned.replace(/\n*Innovations used:.*$/is, '');
