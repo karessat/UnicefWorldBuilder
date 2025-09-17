@@ -109,8 +109,13 @@ app.get('/health', (req, res) => {
 
 // Catch-all handler: send back React's index.html file in production
 if (process.env.NODE_ENV === 'production') {
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'build', 'index.html'));
+  app.use((req, res) => {
+    // Only serve index.html for GET requests to non-API routes
+    if (req.method === 'GET' && !req.path.startsWith('/api/') && !req.path.startsWith('/health')) {
+      res.sendFile(path.join(__dirname, 'build', 'index.html'));
+    } else {
+      res.status(404).json({ error: 'Not found' });
+    }
   });
 }
 
