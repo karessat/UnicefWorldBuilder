@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { ChevronDown, Sparkles, RefreshCw, MapPin, Clock, FileText, Lightbulb, ChevronUp } from 'lucide-react';
+import { ChevronDown, Sparkles, RefreshCw, MapPin, Clock, FileText, Lightbulb, ChevronUp, User, Award, Users } from 'lucide-react';
 import { regions } from '../data/regionalInsights';
 import { timeFrameGuidance, timeFrames } from '../data/timeFrameGuidance';
 import { getAgeLabel } from '../data/ageContexts';
+import { getFellowInfo } from '../data/youthForesightFellows';
 import { generatePrompt, generateRegeneratePrompt, callClaudeAPI } from '../utils/apiService';
 
 // Inspiration suggestions for custom directions
@@ -132,6 +133,92 @@ const ScenarioGenerator = () => {
               </select>
               <ChevronDown className="absolute right-3 top-3 w-5 h-5 text-gray-400 pointer-events-none" />
             </div>
+
+            {/* Youth Foresight Fellow Information */}
+            {selectedRegion && (
+              <div className="mt-4 p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg border border-green-200">
+                {(() => {
+                  const fellowInfo = getFellowInfo(selectedRegion);
+                  if (!fellowInfo) return null;
+                  
+                  return (
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-3">
+                        <div className="flex-shrink-0">
+                          <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                            <User className="w-5 h-5 text-green-600" />
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-gray-700">
+                            Young Visionary research conducted by:
+                          </p>
+                          <p className="text-sm text-gray-700">
+                            {fellowInfo.name === '[Fellow Name TBD]' 
+                              ? `Youth Foresight Fellow for ${selectedRegion}`
+                              : `Youth Foresight Fellow for ${selectedRegion}, ${fellowInfo.name}`
+                            }
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Quote */}
+                      <blockquote className="text-sm italic text-gray-700 border-l-3 border-green-300 pl-3 py-1 bg-white/50 rounded-r">
+                        "{fellowInfo.quote}"
+                      </blockquote>
+
+                      {/* Statistics */}
+                      {(fellowInfo.workshops || fellowInfo.participants) && (
+                        <div className="flex items-center space-x-4 text-xs text-gray-600">
+                          {fellowInfo.workshops && (
+                            <div className="flex items-center space-x-1">
+                              <Award className="w-3 h-3" />
+                              <span>{fellowInfo.workshops} workshops</span>
+                            </div>
+                          )}
+                          {fellowInfo.participants && (
+                            <div className="flex items-center space-x-1">
+                              <Users className="w-3 h-3" />
+                              <span>{fellowInfo.participants} participants</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Focus Areas */}
+                      <div>
+                        <p className="text-xs font-medium text-gray-600 mb-2">Focus Areas:</p>
+                        <div className="flex flex-wrap gap-1">
+                          {fellowInfo.focusAreas.map((area, index) => (
+                            <span 
+                              key={index}
+                              className="inline-block px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full"
+                            >
+                              {area}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Child Rights */}
+                      <div>
+                        <p className="text-xs font-medium text-gray-600 mb-2">Child Rights Focus:</p>
+                        <div className="flex flex-wrap gap-1">
+                          {fellowInfo.childRights.map((right, index) => (
+                            <span 
+                              key={index}
+                              className="inline-block px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full"
+                            >
+                              {right}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
           </div>
 
           {/* Starting Point Toggle */}
