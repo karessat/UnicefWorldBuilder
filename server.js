@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
@@ -8,6 +9,11 @@ const PORT = process.env.PORT || 3001;
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Serve static files from React build in production
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname, 'build')));
+}
 
 // Demo scenarios for server-side fallback
 const demoScenarios = {
@@ -100,6 +106,13 @@ app.post('/api/generate-scenario', async (req, res) => {
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'Server is running' });
 });
+
+// Catch-all handler: send back React's index.html file in production
+if (process.env.NODE_ENV === 'production') {
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'build', 'index.html'));
+  });
+}
 
 app.listen(PORT, () => {
   console.log(`API Server is running on port ${PORT}`);

@@ -4,7 +4,7 @@ import { timeFrameGuidance } from '../data/timeFrameGuidance';
 import { getAgeContext } from '../data/ageContexts';
 import { getDemoScenario } from '../data/demoScenarios';
 import { getAllSafetyInstructions } from './safetyInstructions';
-import { sanitizeUserInput, validateInputSafety } from './inputSanitization';
+import { sanitizeUserInput } from './inputSanitization';
 
 // Function to clean up generated scenario content
 const cleanScenarioContent = (scenario) => {
@@ -266,7 +266,6 @@ export const generateRegeneratePrompt = (selectedRegion, timeFrame, learnerAge, 
     disliked: feedback.disliked ? sanitizeUserInput(feedback.disliked).sanitized : ''
   };
   
-  const guidance = timeFrameGuidance[timeFrame];
   const regional = regionalInsights[selectedRegion];
   
   // Extract core elements from the original scenario to preserve them

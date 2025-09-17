@@ -4,9 +4,12 @@
 
 echo "🚀 Starting UNICEF World Builder development servers..."
 
+# Set development environment
+export NODE_ENV=development
+
 # Start API server in background
 echo "📡 Starting API server on port 3001..."
-node server.js &
+npm run server &
 API_PID=$!
 
 # Wait a moment for API server to start
@@ -14,7 +17,7 @@ sleep 3
 
 # Start React development server
 echo "⚛️ Starting React development server on port 3000..."
-npm start &
+npm run client &
 REACT_PID=$!
 
 # Function to cleanup on exit
