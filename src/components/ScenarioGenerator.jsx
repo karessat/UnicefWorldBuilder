@@ -1,9 +1,43 @@
 import React, { useState } from 'react';
-import { ChevronDown, Sparkles, RefreshCw, MapPin, Clock, FileText } from 'lucide-react';
+import { ChevronDown, Sparkles, RefreshCw, MapPin, Clock, FileText, Lightbulb, ChevronUp } from 'lucide-react';
 import { regions } from '../data/regionalInsights';
 import { timeFrameGuidance, timeFrames } from '../data/timeFrameGuidance';
 import { getAgeLabel } from '../data/ageContexts';
 import { generatePrompt, generateRegeneratePrompt, callClaudeAPI } from '../utils/apiService';
+
+// Inspiration suggestions for custom directions
+const inspirationSuggestions = {
+  "Character Personalization": [
+    "Give the student a specific passion or hobby that shapes their learning journey",
+    "Include the student's family background and how it influences their education",
+    "Show how the student's personality affects their learning experience",
+    "Add details about the student's dreams and aspirations for the future"
+  ],
+  "Scenario Depth": [
+    "Explore what a worst-case scenario could look like and how education adapts",
+    "Show how this educational approach impacts the wider community",
+    "Include perspectives from teachers, parents, and community elders",
+    "Focus on how this student's experience differs from their parents' education"
+  ],
+  "Emotional Dimensions": [
+    "Show a moment of breakthrough when the student overcomes a learning barrier",
+    "Include friendships and peer relationships that shape the learning experience",
+    "Explore how the student's confidence develops through education",
+    "Show how the student becomes a mentor or leader for others"
+  ],
+  "Learning Focus": [
+    "Focus on how the student learns to solve real problems in their community",
+    "Show the student discovering something unexpected about themselves",
+    "Include hands-on projects that connect learning to daily life",
+    "Show collaborative learning where students teach each other"
+  ],
+  "Innovation & Creativity": [
+    "Include an educational innovation the student helps design or improve",
+    "Show how art, music, or storytelling enhances the learning experience",
+    "Explore how the student uses technology in unexpected ways",
+    "Show the student inventing something through their education"
+  ]
+};
 
 const ScenarioGenerator = () => {
   const [selectedRegion, setSelectedRegion] = useState('');
@@ -15,6 +49,16 @@ const ScenarioGenerator = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [feedback, setFeedback] = useState({ liked: '', disliked: '' });
   const [showFeedback, setShowFeedback] = useState(false);
+  const [showInspiration, setShowInspiration] = useState(false);
+
+  // Function to copy suggestion to custom direction field
+  const copySuggestion = (suggestion) => {
+    if (customDirection) {
+      setCustomDirection(customDirection + '\n\n' + suggestion);
+    } else {
+      setCustomDirection(suggestion);
+    }
+  };
 
   const generateScenario = async () => {
     if (!selectedRegion || !timeFrame) {
@@ -180,16 +224,62 @@ const ScenarioGenerator = () => {
 
           {/* Custom Direction */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Custom Direction (Optional)
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Custom Direction (Optional)
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowInspiration(!showInspiration)}
+                className="flex items-center text-sm text-blue-600 hover:text-blue-800 transition-colors"
+              >
+                <Lightbulb className="w-4 h-4 mr-1" />
+                Need inspiration?
+                {showInspiration ? (
+                  <ChevronUp className="w-4 h-4 ml-1" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 ml-1" />
+                )}
+              </button>
+            </div>
             <textarea
               value={customDirection}
               onChange={(e) => setCustomDirection(e.target.value)}
-              placeholder="Describe any specific aspects you'd like the scenario to explore..."
+              placeholder="Try: 'Show how the student's passion for music shapes their learning' or 'Explore what happens when traditional teaching methods prove more effective than new technology'..."
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               rows={3}
             />
+            
+            {/* Inspiration Panel */}
+            {showInspiration && (
+              <div className="mt-3 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <h4 className="text-sm font-semibold text-blue-900 mb-3">💡 Click any suggestion to add it to your custom direction:</h4>
+                <div className="space-y-4">
+                  {Object.entries(inspirationSuggestions).map(([category, suggestions]) => (
+                    <div key={category}>
+                      <h5 className="text-xs font-medium text-blue-800 mb-2 uppercase tracking-wide">{category}</h5>
+                      <div className="grid gap-2">
+                        {suggestions.map((suggestion, index) => (
+                          <button
+                            key={index}
+                            type="button"
+                            onClick={() => copySuggestion(suggestion)}
+                            className="text-left text-sm text-gray-700 hover:text-blue-700 hover:bg-blue-100 p-2 rounded transition-colors border border-transparent hover:border-blue-200"
+                          >
+                            "{suggestion}"
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 pt-3 border-t border-blue-200">
+                  <p className="text-xs text-blue-700">
+                    💡 <strong>Tip:</strong> Combine multiple suggestions or use them as starting points for your own ideas!
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Generate Button */}

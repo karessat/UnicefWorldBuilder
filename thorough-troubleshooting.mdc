@@ -1,0 +1,6 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+When troubleshooting or looking for the source of a problem or unexpected behavior, thoroughly review the code base to find all of the potential sources of the issue and understand how they work together before doing a comprehensive fix.
