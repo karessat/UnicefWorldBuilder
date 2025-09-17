@@ -6,6 +6,36 @@ import { getDemoScenario } from '../data/demoScenarios';
 import { getAllSafetyInstructions } from './safetyInstructions';
 import { sanitizeUserInput, validateInputSafety } from './inputSanitization';
 
+// Function to clean up generated scenario content
+const cleanScenarioContent = (scenario) => {
+  if (!scenario || typeof scenario !== 'string') return scenario;
+  
+  let cleaned = scenario;
+  
+  // Remove "Title:" prefix and quotes around titles at the beginning
+  cleaned = cleaned.replace(/^Title:\s*["']([^"']+)["']\s*/i, '$1\n\n');
+  cleaned = cleaned.replace(/^Title:\s*([^"\n]+)\s*/i, '$1\n\n');
+  cleaned = cleaned.replace(/^["']([^"']+)["']\s*/m, '$1\n\n');
+  
+  // Remove various forms of innovations/technologies listing at the end
+  cleaned = cleaned.replace(/\n*\[?Innovations used:.*$/is, '');
+  cleaned = cleaned.replace(/\n*Innovations used:.*$/is, '');
+  cleaned = cleaned.replace(/\n*Technologies featured:.*$/is, '');
+  cleaned = cleaned.replace(/\n*Educational innovations included:.*$/is, '');
+  cleaned = cleaned.replace(/\n*Key innovations featured:.*$/is, '');
+  cleaned = cleaned.replace(/\n*Technologies used:.*$/is, '');
+  cleaned = cleaned.replace(/\n*\[Educational innovations:.*$/is, '');
+  cleaned = cleaned.replace(/\n*\[Technologies:.*$/is, '');
+  
+  // Remove any trailing lists in brackets
+  cleaned = cleaned.replace(/\n*\[.*?\]$/s, '');
+  
+  // Clean up any trailing whitespace or multiple newlines
+  cleaned = cleaned.trim().replace(/\n{3,}/g, '\n\n');
+  
+  return cleaned;
+};
+
 export const generatePrompt = (selectedRegion, timeFrame, learnerAge, useExistingScenario, customDirection) => {
   // Sanitize user inputs before processing
   const sanitizedCustomDirection = customDirection ? sanitizeUserInput(customDirection).sanitized : '';
@@ -363,11 +393,11 @@ export const callClaudeAPI = async (prompt, selectedRegion, timeFrame) => {
     // Return demo scenario if available
     const demoScenario = getDemoScenario(selectedRegion, timeFrame);
     if (demoScenario) {
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          resolve(demoScenario + '\n\n[Demo Mode: This is a sample scenario. Add your Anthropic API key to generate custom scenarios.]');
-        }, 1500); // Simulate API delay
-      });
+        return new Promise((resolve) => {
+          setTimeout(() => {
+            resolve(cleanScenarioContent(demoScenario) + '\n\n[Demo Mode: This is a sample scenario. Add your Anthropic API key to generate custom scenarios.]');
+          }, 1500); // Simulate API delay
+        });
     }
     
     // Fallback message
@@ -404,7 +434,7 @@ export const callClaudeAPI = async (prompt, selectedRegion, timeFrame) => {
         console.log('Falling back to demo mode due to server API key error');
         const demoScenario = getDemoScenario(selectedRegion, timeFrame);
         if (demoScenario) {
-          return demoScenario + '\n\n[Demo Mode: Server API key not configured. This is a sample scenario.]';
+          return cleanScenarioContent(demoScenario) + '\n\n[Demo Mode: Server API key not configured. This is a sample scenario.]';
         }
         return `Demo scenario for ${selectedRegion} in ${timeFrame}. Server API key not configured.\n\n[Demo Mode: Configure API key on server for custom scenarios.]`;
       }
@@ -413,7 +443,7 @@ export const callClaudeAPI = async (prompt, selectedRegion, timeFrame) => {
     }
 
     const data = await response.json();
-    return data.scenario;
+    return cleanScenarioContent(data.scenario);
   } catch (error) {
     console.error('Error calling Claude API:', error);
     
@@ -421,7 +451,7 @@ export const callClaudeAPI = async (prompt, selectedRegion, timeFrame) => {
     console.log('Falling back to demo mode due to error');
     const demoScenario = getDemoScenario(selectedRegion, timeFrame);
     if (demoScenario) {
-      return demoScenario + '\n\n[Demo Mode: Server error occurred. This is a sample scenario.]';
+      return cleanScenarioContent(demoScenario) + '\n\n[Demo Mode: Server error occurred. This is a sample scenario.]';
     }
     return `Demo scenario for ${selectedRegion} in ${timeFrame}. Server error occurred.\n\n[Demo Mode: Fix server configuration for custom scenarios.]`;
   }
