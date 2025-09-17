@@ -675,6 +675,25 @@ const ScenarioGenerator = () => {
              </div>
            )}
          </div>
+
+         {/* Footer with Conceptia Logo and Copyright */}
+         <div className="mt-8 pt-6 border-t border-gray-200 text-center">
+           <div className="flex flex-col items-center space-y-3">
+             {/* Conceptia Logo */}
+             <div className="flex items-center justify-center">
+               <img 
+                 src="/conceptia-logo.png" 
+                 alt="Conceptia" 
+                 className="h-8 w-auto"
+               />
+             </div>
+             
+             {/* Copyright Notice */}
+             <p className="text-xs text-gray-500">
+               © Conceptia 2025
+             </p>
+           </div>
+         </div>
        </div>
      </div>
   );
