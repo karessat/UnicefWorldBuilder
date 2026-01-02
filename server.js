@@ -94,14 +94,27 @@ app.post('/api/generate-scenario', async (req, res) => {
     });
 
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.status}`);
+      const errorText = await response.text();
+      console.error('Claude API error response:', response.status, errorText);
+      throw new Error(`API request failed: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
-    res.json({ scenario: data.content[0].text });
+    
+    // Handle different response structures
+    if (data.content && Array.isArray(data.content) && data.content.length > 0) {
+      const scenarioText = data.content[0].text || data.content[0].content || '';
+      res.json({ scenario: scenarioText });
+    } else if (data.text) {
+      res.json({ scenario: data.text });
+    } else {
+      console.error('Unexpected API response structure:', JSON.stringify(data));
+      throw new Error('Unexpected response structure from Claude API');
+    }
   } catch (error) {
-    console.error('Error calling Claude API:', error);
-    res.status(500).json({ error: 'Failed to generate scenario' });
+    console.error('Error calling Claude API:', error.message);
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ error: 'Failed to generate scenario', details: error.message });
   }
 });
 
