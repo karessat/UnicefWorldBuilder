@@ -3,6 +3,9 @@ const cors = require('cors');
 const path = require('path');
 require('dotenv').config();
 
+// Import wiki service
+const { createOrUpdateWikiPage, WIKI_ENABLED } = require('./server/wikiService');
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -102,9 +105,28 @@ app.post('/api/generate-scenario', async (req, res) => {
   }
 });
 
+// Wiki endpoint (non-blocking, fire-and-forget)
+app.post('/api/save-to-wiki', async (req, res) => {
+  // Return immediately, process in background
+  res.json({ status: 'processing' });
+  
+  // Process wiki save asynchronously (don't block)
+  createOrUpdateWikiPage(req.body)
+    .then(result => {
+      if (result.success) {
+        console.log(`✅ Scenario saved to wiki: ${result.pageTitle}`);
+      } else {
+        console.log(`⚠️ Wiki save failed: ${result.reason || result.error}`);
+      }
+    })
+    .catch(error => {
+      console.error('❌ Wiki save error:', error);
+    });
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.json({ status: 'OK', message: 'Server is running' });
+  res.json({ status: 'OK', message: 'Server is running', wikiEnabled: WIKI_ENABLED });
 });
 
 // Catch-all handler: send back React's index.html file in production

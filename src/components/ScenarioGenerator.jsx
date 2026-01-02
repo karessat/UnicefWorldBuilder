@@ -6,6 +6,7 @@ import { getAgeLabel } from '../data/ageContexts';
 import { getFellowInfo } from '../data/youthForesightFellows';
 import { generatePrompt, generateRegeneratePrompt, callClaudeAPI } from '../utils/apiService';
 import { validateInputSafety } from '../utils/inputSanitization';
+import { saveScenarioToWiki } from '../utils/wikiService';
 
 // Inspiration suggestions for custom directions
 const inspirationSuggestions = {
@@ -48,11 +49,13 @@ const ScenarioGenerator = () => {
   const [learnerAge, setLearnerAge] = useState('');
   const [customDirection, setCustomDirection] = useState('');
   const [generatedScenario, setGeneratedScenario] = useState('');
+  const [scenarioTitle, setScenarioTitle] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [feedback, setFeedback] = useState({ liked: '', disliked: '' });
   const [showFeedback, setShowFeedback] = useState(false);
   const [showInspiration, setShowInspiration] = useState(false);
   const [showSafetyInfo, setShowSafetyInfo] = useState(false);
+  const [wikiPageTitle, setWikiPageTitle] = useState(null);
 
   // Function to copy suggestion to custom direction field
   const copySuggestion = (suggestion) => {
@@ -61,6 +64,53 @@ const ScenarioGenerator = () => {
     } else {
       setCustomDirection(suggestion);
     }
+  };
+
+  // Helper function to extract scenario name from full title
+  // Title format: "Region, Year, Age X, Scenario Name"
+  const extractScenarioName = (fullTitle) => {
+    if (!fullTitle) return null;
+    
+    // Match pattern: "Region, Year, Age X, Scenario Name"
+    const match = fullTitle.match(/,\s*Age\s*\d+,\s*(.+)$/);
+    if (match && match[1]) {
+      return match[1].trim();
+    }
+    
+    // Fallback: try to extract after the last comma if pattern doesn't match
+    const parts = fullTitle.split(',').map(p => p.trim());
+    if (parts.length >= 4) {
+      return parts.slice(3).join(', '); // Get everything after "Region, Year, Age X"
+    }
+    
+    return null;
+  };
+
+  // Helper function to generate wiki page title (matches server logic)
+  // Format: Scenario_World_Builder/[Region]/[TimeFrame]/Age[age]_[ScenarioName]
+  const generateWikiPageTitle = (region, timeFrame, learnerAge, scenarioTitle) => {
+    const cleanRegion = region.replace(/\s+/g, '_').replace(/[<>[\]{}|]/g, '');
+    
+    // Extract scenario name from the title if available
+    if (scenarioTitle) {
+      const scenarioName = extractScenarioName(scenarioTitle);
+      
+      if (scenarioName) {
+        // Clean the scenario name for MediaWiki (replace spaces with underscores, remove special chars)
+        const cleanScenarioName = scenarioName
+          .replace(/[<>[\]{}|#]/g, '') // Remove MediaWiki special chars
+          .replace(/\s+/g, '_')
+          .replace(/[^\w_-]/g, ''); // Remove any remaining non-word chars except _ and -
+        
+        const agePart = learnerAge ? `Age${learnerAge}` : 'Age';
+        return `Scenario_World_Builder/${cleanRegion}/${timeFrame}/${agePart}_${cleanScenarioName}`;
+      }
+    }
+    
+    // Fallback to old format if no title or scenario name extracted
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+    const agePart = learnerAge ? `-Age${learnerAge}` : '';
+    return `Scenario_World_Builder/${cleanRegion}/${timeFrame}/Scenario_${cleanRegion}_${timeFrame}${agePart}_${timestamp}`;
   };
 
   // Function to validate all user inputs before generation
@@ -118,14 +168,48 @@ const ScenarioGenerator = () => {
       return;
     }
 
+    // Reset wiki page title and scenario title when generating a new scenario
+    // This ensures new scenarios (with different params) create new pages
+    setWikiPageTitle(null);
+    setScenarioTitle('');
+    
     setIsGenerating(true);
     setShowFeedback(false);
 
     try {
       const prompt = generatePrompt(selectedRegion, timeFrame, learnerAge, useExistingScenario, customDirection);
-      const scenario = await callClaudeAPI(prompt, selectedRegion, timeFrame);
-      setGeneratedScenario(scenario);
+      const result = await callClaudeAPI(prompt, selectedRegion, timeFrame);
+      
+      // Handle both old format (string) and new format (object with title/scenario)
+      if (typeof result === 'string') {
+        setGeneratedScenario(result);
+        setScenarioTitle('');
+      } else {
+        setGeneratedScenario(result.scenario);
+        setScenarioTitle(result.title || '');
+      }
+      
       setShowFeedback(true);
+      
+      // Generate and store wiki page title for first generation
+      const titleToUse = (typeof result === 'object' && result.title) ? result.title : scenarioTitle || '';
+      const newPageTitle = generateWikiPageTitle(selectedRegion, timeFrame, learnerAge, titleToUse);
+      setWikiPageTitle(newPageTitle);
+      
+      // Save to wiki (non-blocking, fire-and-forget)
+      saveScenarioToWiki({
+        region: selectedRegion,
+        timeFrame: timeFrame,
+        learnerAge: learnerAge,
+        scenario: typeof result === 'object' ? result.scenario : result,
+        scenarioTitle: titleToUse,
+        useExistingScenario: useExistingScenario,
+        customDirection: customDirection,
+        pageTitle: newPageTitle
+      }).catch(err => {
+        // Silently handle - wiki save is optional and should never interrupt user experience
+        console.log('Wiki save failed (non-critical):', err);
+      });
     } catch (error) {
       console.error('Error generating scenario:', error);
       alert('Error generating scenario. Please try again.');
@@ -148,10 +232,41 @@ const ScenarioGenerator = () => {
     setIsGenerating(true);
 
     try {
-      const prompt = generateRegeneratePrompt(selectedRegion, timeFrame, learnerAge, generatedScenario, feedback, useExistingScenario);
-      const scenario = await callClaudeAPI(prompt, selectedRegion, timeFrame);
-      setGeneratedScenario(scenario);
+      const prompt = generateRegeneratePrompt(selectedRegion, timeFrame, learnerAge, generatedScenario, feedback, useExistingScenario, scenarioTitle);
+      const result = await callClaudeAPI(prompt, selectedRegion, timeFrame);
+      
+      // Handle both old format (string) and new format (object with title/scenario)
+      if (typeof result === 'string') {
+        setGeneratedScenario(result);
+        // Keep existing title if no new title provided
+      } else {
+        setGeneratedScenario(result.scenario);
+        // Update title if provided, otherwise keep existing
+        if (result.title) {
+          setScenarioTitle(result.title);
+        }
+      }
+      
       setFeedback({ liked: '', disliked: '' });
+      
+      // Use existing page title if available, otherwise generate new one
+      const titleToUse = (typeof result === 'object' && result.title) ? result.title : scenarioTitle || '';
+      const pageTitleToUse = wikiPageTitle || generateWikiPageTitle(selectedRegion, timeFrame, learnerAge, titleToUse);
+      
+      // Save to wiki (non-blocking, fire-and-forget) - UPDATE existing page
+      saveScenarioToWiki({
+        region: selectedRegion,
+        timeFrame: timeFrame,
+        learnerAge: learnerAge,
+        scenario: typeof result === 'object' ? result.scenario : result,
+        scenarioTitle: titleToUse,
+        useExistingScenario: useExistingScenario,
+        customDirection: customDirection,
+        pageTitle: pageTitleToUse
+      }).catch(err => {
+        // Silently handle - wiki save is optional and should never interrupt user experience
+        console.log('Wiki save failed (non-critical):', err);
+      });
     } catch (error) {
       console.error('Error regenerating scenario:', error);
       alert('Error regenerating scenario. Please try again.');
@@ -449,7 +564,7 @@ const ScenarioGenerator = () => {
         {generatedScenario && (
           <div className="border-t pt-8">
             <h2 className="text-2xl font-bold text-gray-800 mb-4">
-              Education in {selectedRegion}, {timeFrame}
+              {scenarioTitle || `Education in ${selectedRegion}, ${timeFrame}`}
               <span className="text-sm font-normal text-gray-600 ml-2">
                 ({useExistingScenario ? 'Based on Young Visionaries research' : 'Fresh scenario'})
               </span>

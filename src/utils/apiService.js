@@ -6,6 +6,40 @@ import { getDemoScenario } from '../data/demoScenarios';
 import { getAllSafetyInstructions } from './safetyInstructions';
 import { sanitizeUserInput } from './inputSanitization';
 
+// Function to extract title and scenario from response
+// Title format: "Region, Year, Age X, Scenario Name"
+const extractTitleAndScenario = (response) => {
+  if (!response || typeof response !== 'string') {
+    return { title: null, scenario: response };
+  }
+
+  // Look for title in format: "Region, Year, Age X, Scenario Name"
+  // Title should be on first line, separated from scenario by double newline
+  const lines = response.trim().split('\n\n');
+  
+  // Check if first line matches the title pattern
+  const titlePattern = /^(.+),\s*(\d{4}),\s*Age\s*(\d+),\s*(.+)$/;
+  const firstLine = lines[0].trim();
+  
+  if (titlePattern.test(firstLine)) {
+    return {
+      title: firstLine,
+      scenario: lines.slice(1).join('\n\n').trim()
+    };
+  }
+  
+  // Fallback: if first line is short and followed by double newline, treat as title
+  if (lines.length > 1 && firstLine.length < 150 && firstLine.includes(',')) {
+    return {
+      title: firstLine,
+      scenario: lines.slice(1).join('\n\n').trim()
+    };
+  }
+  
+  // No title found
+  return { title: null, scenario: response };
+};
+
 // Function to clean up generated scenario content
 const cleanScenarioContent = (scenario) => {
   if (!scenario || typeof scenario !== 'string') return scenario;
@@ -202,7 +236,12 @@ ${sanitizedCustomDirection ? `USER DIRECTION: ${sanitizedCustomDirection}` : ''}
 
 FINAL REMINDER: Your main character must be ${learnerAge ? `${learnerAge} years old` : 'the specific age you choose'} - verify this before writing.
 
-Please create a scenario (250-300 words) featuring a ${learnerAge ? `${learnerAge}-year-old` : '[specify age]'} student in ${selectedRegion}, ${timeFrame}.`;
+Please create a scenario (250-300 words) featuring a ${learnerAge ? `${learnerAge}-year-old` : '[specify age]'} student in ${selectedRegion}, ${timeFrame}.
+
+IMPORTANT: Start your response with a title on the first line in this exact format:
+${selectedRegion}, ${timeFrame}, Age ${learnerAge || '[age]'}, [Short clever title that captures the gist of the scenario]
+
+Then leave a blank line, then provide the scenario text.`;
 
   // Debug logging
   console.log('=== PROMPT DEBUG ===');
@@ -259,7 +298,7 @@ const extractScenarioSetting = (scenario) => {
   return null;
 };
 
-export const generateRegeneratePrompt = (selectedRegion, timeFrame, learnerAge, generatedScenario, feedback, useExistingScenario) => {
+export const generateRegeneratePrompt = (selectedRegion, timeFrame, learnerAge, generatedScenario, feedback, useExistingScenario, existingTitle) => {
   // Sanitize user feedback inputs before processing
   const sanitizedFeedback = {
     liked: feedback.liked ? sanitizeUserInput(feedback.liked).sanitized : '',
@@ -316,6 +355,7 @@ MANDATORY PRESERVATION REQUIREMENTS:
 - Preserve the core storyline structure and basic plot
 - Keep the same time period: ${timeFrame}
 - Maintain the regional context: ${selectedRegion}
+${existingTitle ? `- Keep the same title: "${existingTitle}"` : ''}
 
 REFINEMENT INSTRUCTIONS:
 1. ENHANCE, don't replace: Build upon the existing scenario rather than creating something new
@@ -364,7 +404,11 @@ REFINED SCENARIO REQUIREMENTS:
 - 250-300 words with richer detail and better alignment with user preferences
 - Maintain regional authenticity for ${selectedRegion}
 
-Create a refined and improved version of the SAME scenario that addresses the user's feedback while preserving the core story elements they already have.`;
+Create a refined and improved version of the SAME scenario that addresses the user's feedback while preserving the core story elements they already have.
+
+IMPORTANT: Start your response with a title on the first line. ${existingTitle ? `Use the existing title: "${existingTitle}"` : `Create a title in this format: ${selectedRegion}, ${timeFrame}, Age ${learnerAge || '[age]'}, [Short clever title that captures the gist of the scenario]`}
+
+Then leave a blank line, then provide the refined scenario text.`;
 
   // Debug logging
   console.log('=== REGENERATION PROMPT DEBUG ===');
@@ -409,16 +453,20 @@ export const callClaudeAPI = async (prompt, selectedRegion, timeFrame) => {
         console.log('Falling back to demo mode due to server API key error');
         const demoScenario = getDemoScenario(selectedRegion, timeFrame);
         if (demoScenario) {
-          return cleanScenarioContent(demoScenario) + '\n\n[Demo Mode: Server API key not configured. This is a sample scenario.]';
+          const cleaned = cleanScenarioContent(demoScenario);
+          return { title: null, scenario: cleaned + '\n\n[Demo Mode: Server API key not configured. This is a sample scenario.]' };
         }
-        return `Demo scenario for ${selectedRegion} in ${timeFrame}. Server API key not configured.\n\n[Demo Mode: Configure API key on server for custom scenarios.]`;
+        return { title: null, scenario: `Demo scenario for ${selectedRegion} in ${timeFrame}. Server API key not configured.\n\n[Demo Mode: Configure API key on server for custom scenarios.]` };
       }
       
       throw new Error(errorData.error || `API request failed: ${response.status}`);
     }
 
     const data = await response.json();
-    return cleanScenarioContent(data.scenario);
+    const cleaned = cleanScenarioContent(data.scenario);
+    const { title, scenario } = extractTitleAndScenario(cleaned);
+    
+    return { title, scenario };
   } catch (error) {
     console.error('Error calling Claude API:', error);
     
@@ -426,8 +474,9 @@ export const callClaudeAPI = async (prompt, selectedRegion, timeFrame) => {
     console.log('Falling back to demo mode due to error');
     const demoScenario = getDemoScenario(selectedRegion, timeFrame);
     if (demoScenario) {
-      return cleanScenarioContent(demoScenario) + '\n\n[Demo Mode: Server error occurred. This is a sample scenario.]';
+      const cleaned = cleanScenarioContent(demoScenario);
+      return { title: null, scenario: cleaned + '\n\n[Demo Mode: Server error occurred. This is a sample scenario.]' };
     }
-    return `Demo scenario for ${selectedRegion} in ${timeFrame}. Server error occurred.\n\n[Demo Mode: Fix server configuration for custom scenarios.]`;
+    return { title: null, scenario: `Demo scenario for ${selectedRegion} in ${timeFrame}. Server error occurred.\n\n[Demo Mode: Fix server configuration for custom scenarios.]` };
   }
 };
