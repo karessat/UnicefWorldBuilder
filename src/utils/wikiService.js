@@ -6,7 +6,13 @@ export const saveScenarioToWiki = async (scenarioData) => {
   // Check if wiki is enabled (optional feature flag)
   // Note: This is a client-side check, but the server will also check
   // We do this to avoid unnecessary network calls
+  console.log('Wiki save check:', {
+    REACT_APP_WIKI_ENABLED: process.env.REACT_APP_WIKI_ENABLED,
+    NODE_ENV: process.env.NODE_ENV
+  });
+  
   if (process.env.REACT_APP_WIKI_ENABLED !== 'true') {
+    console.log('Wiki save skipped: REACT_APP_WIKI_ENABLED is not "true"');
     return { success: false, reason: 'disabled' };
   }
   
