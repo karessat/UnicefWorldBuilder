@@ -382,47 +382,15 @@ Create a refined and improved version of the SAME scenario that addresses the us
 };
 
 export const callClaudeAPI = async (prompt, selectedRegion, timeFrame) => {
-  // Add debugging to see what environment variables are being read
-  console.log('Environment variables check:', {
-    NODE_ENV: process.env.NODE_ENV,
-    REACT_APP_ANTHROPIC_API_KEY: process.env.REACT_APP_ANTHROPIC_API_KEY ? 'SET' : 'NOT SET',
-    API_KEY_LENGTH: process.env.REACT_APP_ANTHROPIC_API_KEY?.length || 0
-  });
-
-  // Check if we're in demo mode (no API key configured)
-  const isDemoMode = !process.env.REACT_APP_ANTHROPIC_API_KEY || 
-                     process.env.REACT_APP_ANTHROPIC_API_KEY === 'your_api_key_here' ||
-                     process.env.REACT_APP_ANTHROPIC_API_KEY.trim() === '';
+  // All API calls go through the server proxy which handles API key authentication
+  // Client-side code does not need access to the API key for security reasons
   
-  console.log('Demo mode:', isDemoMode);
-  
-  if (isDemoMode) {
-    // Return demo scenario if available
-    const demoScenario = getDemoScenario(selectedRegion, timeFrame);
-    if (demoScenario) {
-        return new Promise((resolve) => {
-          setTimeout(() => {
-            resolve(cleanScenarioContent(demoScenario) + '\n\n[Demo Mode: This is a sample scenario. Add your Anthropic API key to generate custom scenarios.]');
-          }, 1500); // Simulate API delay
-        });
-    }
-    
-    // Fallback message
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(`This is a demo scenario for ${selectedRegion} in ${timeFrame}. To generate custom scenarios, please add your Anthropic API key to the .env file.\n\n[Demo Mode: Add your API key to generate personalized scenarios based on your selections.]`);
-      }, 1500);
-    });
-  }
-
   try {
     // Use the proxy server instead of calling the API directly
     // In development, use the full URL to the Express server
     const apiUrl = process.env.NODE_ENV === 'development' 
       ? 'http://localhost:3001/api/generate-scenario'
       : '/api/generate-scenario';
-      
-    console.log('Calling API server:', apiUrl);
     
     const response = await fetch(apiUrl, {
       method: "POST",

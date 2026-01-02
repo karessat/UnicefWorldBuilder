@@ -54,8 +54,8 @@ npm install
 Then edit `.env` and add your Anthropic API key:
 ```
 ANTHROPIC_API_KEY=your_api_key_here
-REACT_APP_ANTHROPIC_API_KEY=your_api_key_here
 ```
+Note: The API key is only used on the server side for security. Client-side code makes requests through the server proxy.
 
 3. Start the development servers:
 ```bash
