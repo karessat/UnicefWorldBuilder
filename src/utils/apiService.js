@@ -106,7 +106,7 @@ const characterNames = {
   'United States of America': ['Emma', 'James', 'Olivia', 'William', 'Sophia', 'Benjamin']
 };
 
-const genders = ['a girl', 'a boy', 'a non-binary young person'];
+const genders = ['a girl', 'a boy'];
 
 const personalityTraits = [
   'curious and methodical',
@@ -236,14 +236,12 @@ export const generatePrompt = (selectedRegion, timeFrame, learnerAge, useExistin
 
   // The randomized brief: character, setting, story shape, lenses, innovations.
   // Name lists alternate feminine/masculine (even/odd indices), so pick the
-  // gender first and draw the name from a matching pool; non-binary characters
-  // can carry any name. The fallback names are unisex.
+  // gender first and draw the name from a matching pool. The fallback names
+  // are unisex.
   const regionNames = characterNames[selectedRegion] || ['Alex', 'Sam', 'Jordan', 'Taylor', 'Casey', 'Riley'];
   const gender = pickRandom(genders);
   const namePool = characterNames[selectedRegion]
-    ? (gender === 'a girl' ? regionNames.filter((_, i) => i % 2 === 0)
-      : gender === 'a boy' ? regionNames.filter((_, i) => i % 2 === 1)
-      : regionNames)
+    ? regionNames.filter((_, i) => (gender === 'a girl' ? i % 2 === 0 : i % 2 === 1))
     : regionNames;
   const age = learnerAge || (8 + Math.floor(Math.random() * 10));
   const spec = {
@@ -313,20 +311,27 @@ Then leave a blank line, then the scenario text.`;
   return { system: buildSystemPrompt(), user };
 };
 
+// Words that match the capitalized-name shape but are never character names
+const NAME_STOPWORDS = new Set(['In', 'From', 'At', 'The', 'An', 'Experiences']);
+
+const isLikelyName = (word) =>
+  typeof word === 'string' && /^[A-Z][a-z]+$/.test(word) && !NAME_STOPWORDS.has(word);
+
 // Helper function to extract character name from scenario
-const extractCharacterName = (scenario) => {
+export const extractCharacterName = (scenario) => {
   // Look for patterns like "12-year-old Maria" or "Maria, a 12-year-old"
   const namePatterns = [
-    /(\d+)-year-old\s+([A-Z][a-z]+)/i,
-    /([A-Z][a-z]+),?\s+(?:an?\s+)?(\d+)-year-old/i,
-    /([A-Z][a-z]+)\s+(?:in|from|at|experiences)/i
+    /(\d+)-year-old\s+([A-Z][a-z]+)/,
+    /([A-Z][a-z]+),?\s+(?:an?\s+)?(\d+)-year-old/,
+    /([A-Z][a-z]+)\s+(?:in|from|at|experiences)/
   ];
 
   for (const pattern of namePatterns) {
     const match = scenario.match(pattern);
     if (match) {
       // Return the name part (could be in different capture groups depending on pattern)
-      return match[1].match(/^[A-Z][a-z]+$/) ? match[1] : match[2];
+      const candidate = isLikelyName(match[1]) ? match[1] : match[2];
+      if (isLikelyName(candidate)) return candidate;
     }
   }
 

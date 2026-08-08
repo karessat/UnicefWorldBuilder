@@ -104,9 +104,16 @@ app.post('/api/generate-scenario', async (req, res) => {
 
     const data = await response.json();
     
-    // Handle different response structures
+    // Handle different response structures.
+    // claude-sonnet-5 responses can begin with a thinking block, so find the
+    // first text block rather than assuming content[0] is it.
     if (data.content && Array.isArray(data.content) && data.content.length > 0) {
-      const scenarioText = data.content[0].text || data.content[0].content || '';
+      const textBlock = data.content.find(block => block.type === 'text' && block.text);
+      const scenarioText = textBlock ? textBlock.text : '';
+      if (!scenarioText) {
+        console.error('No text block in API response. stop_reason:', data.stop_reason, 'blocks:', data.content.map(b => b.type));
+        throw new Error(`Claude API returned no text (stop_reason: ${data.stop_reason})`);
+      }
       res.json({ scenario: scenarioText });
     } else if (data.text) {
       res.json({ scenario: data.text });
