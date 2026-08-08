@@ -48,7 +48,7 @@ One of Priya's most powerful experiences is participating in the school's social
 // API proxy endpoint
 app.post('/api/generate-scenario', async (req, res) => {
   try {
-    const { prompt } = req.body;
+    const { prompt, system } = req.body;
     
     // Check if API key is configured
     if (!process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY === 'your_api_key_here') {
@@ -85,8 +85,11 @@ app.post('/api/generate-scenario', async (req, res) => {
         "anthropic-version": "2023-06-01"
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 800,
+        model: "claude-sonnet-5",
+        // claude-sonnet-5's adaptive thinking counts against max_tokens, so
+        // leave headroom beyond the ~450-word scenario itself
+        max_tokens: 4000,
+        ...(system ? { system } : {}),
         messages: [
           { role: "user", content: prompt }
         ]

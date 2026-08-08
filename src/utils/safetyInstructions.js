@@ -2,11 +2,10 @@
 export const coreInstructions = `
 SAFETY REQUIREMENTS:
 - Create innovative, empowering educational scenarios that inspire and engage learners
-- Focus on bold, positive futures that advance human rights, dignity, and wellbeing
+- Focus on positive futures that advance human rights, dignity, and wellbeing
 - Avoid content promoting violence, abuse, discrimination, or harm
 - Ensure all scenarios respect cultural diversity and promote inclusion
-- Be creative and imaginative while maintaining child safety and age-appropriate content
-- Focus on empowering students and communities through transformative education
+- Maintain child safety and age-appropriate content throughout
 - Ensure content aligns with UNICEF's mission and child rights principles
 `;
 
@@ -26,40 +25,35 @@ PROHIBITED CONTENT:
 - Scenarios that could traumatize or distress young readers
 `;
 
-export const innovationEncouragement = `
-INNOVATION AND CREATIVITY REQUIREMENTS:
-- Be bold and imaginative with educational technologies and approaches
-- Include breakthrough innovations that push the boundaries of what's possible
-- Show radical transformations in how education works
-- Use multiple scan hits to create rich, complex future learning environments
-- Include surprising technological developments and social changes
-- Create scenarios that feel genuinely futuristic and inspiring
-- Show education evolving in unexpected and exciting ways
-- Include "wild card" elements that challenge conventional thinking
-- Make scenarios feel like windows into genuinely transformed futures
+// Foresight craft: what makes a scenario genuinely forward-thinking AND believable.
+// Replaces the earlier "wow factor" instructions, which pushed every scenario
+// into the same implausible techno-optimist register.
+export const foresightCraft = `
+FUTURES CRAFT — how to make the scenario forward-thinking and believable:
+- Traceable change: for each required innovation, include roughly one sentence of backstory showing how the world plausibly got from today to there (a program that scaled, a crisis that forced change, a cost that collapsed, a movement that won).
+- Continuity: real futures are mostly familiar. Show at least two aspects of daily life that have NOT changed — food, chores, friendship, weather, an old building, a grandmother's habits. Anchor the new in the ordinary.
+- Friction: include one honest cost, tradeoff, or shortcoming — something the new system still gets wrong, someone it doesn't serve well, or something valuable that was lost. Frictionless utopias read as fantasy.
+- Second-order effects: the most forward-thinking element should not be a gadget but a social consequence — how family roles, work, community life, or the meaning of "school" reorganized around the change.
+- Human center: the story is about a specific child's relationships, choices, and feelings. Innovations stay in the background of a human story, never a product tour.
+- Grounded imagination: nothing that violates known science; surprising is good, inconceivable is not. The test: a thoughtful reader should say "I hadn't imagined that — but I can see how it happens."
 `;
 
 export const positiveGuidance = `
 POSITIVE FOCUS REQUIREMENTS:
-- Emphasize student agency, voice, and empowerment through innovative means
+- Emphasize student agency, voice, and empowerment
 - Show education as a tool for positive social transformation
-- Include collaborative, supportive learning environments enhanced by future technologies
-- Demonstrate respect for local cultures while embracing global innovations
-- Focus on solutions that build community and connection through new paradigms
-- Show how education can address real-world challenges through breakthrough approaches
-- Include diverse role models and positive mentorship in futuristic contexts
-- Promote environmental stewardship through innovative educational practices
-- Encourage critical thinking and peaceful problem-solving with advanced tools
-- Show education leading to exciting new career and life opportunities
+- Demonstrate respect for local cultures and knowledge
+- Include supportive relationships and diverse role models
+- Encourage critical thinking and peaceful problem-solving
 `;
 
-// Combine all safety instructions for easy inclusion in prompts
+// Combine all instruction blocks for inclusion in the system prompt
 export const getAllSafetyInstructions = () => {
   return `${coreInstructions}
 
 ${contentRestrictions}
 
-${innovationEncouragement}
+${foresightCraft}
 
 ${positiveGuidance}`;
 };

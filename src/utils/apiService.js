@@ -1,5 +1,5 @@
 import { regionalInsights } from '../data/regionalInsights';
-import { globalScanHits } from '../data/globalScanHits';
+import { globalScanHits, globalScanHitCategories, techCategories } from '../data/globalScanHits';
 import { timeFrameGuidance } from '../data/timeFrameGuidance';
 import { getAgeContext } from '../data/ageContexts';
 import { getDemoScenario } from '../data/demoScenarios';
@@ -16,18 +16,18 @@ const extractTitleAndScenario = (response) => {
   // Look for title in format: "Region, Year, Age X, Scenario Name"
   // Title should be on first line, separated from scenario by double newline
   const lines = response.trim().split('\n\n');
-  
+
   // Check if first line matches the title pattern
   const titlePattern = /^(.+),\s*(\d{4}),\s*Age\s*(\d+),\s*(.+)$/;
   const firstLine = lines[0].trim();
-  
+
   if (titlePattern.test(firstLine)) {
     return {
       title: firstLine,
       scenario: lines.slice(1).join('\n\n').trim()
     };
   }
-  
+
   // Fallback: if first line is short and followed by double newline, treat as title
   if (lines.length > 1 && firstLine.length < 150 && firstLine.includes(',')) {
     return {
@@ -35,7 +35,7 @@ const extractTitleAndScenario = (response) => {
       scenario: lines.slice(1).join('\n\n').trim()
     };
   }
-  
+
   // No title found
   return { title: null, scenario: response };
 };
@@ -43,22 +43,22 @@ const extractTitleAndScenario = (response) => {
 // Function to clean up generated scenario content
 const cleanScenarioContent = (scenario) => {
   if (!scenario || typeof scenario !== 'string') return scenario;
-  
+
   let cleaned = scenario;
-  
+
   // Remove "Title:" prefix and quotes around titles at the beginning
   cleaned = cleaned.replace(/^Title:\s*["']([^"']+)["']\s*/i, '$1\n\n');
   cleaned = cleaned.replace(/^Title:\s*([^"\n]+)\s*/i, '$1\n\n');
   cleaned = cleaned.replace(/^["']([^"']+)["']\s*/m, '$1\n\n');
-  
+
   // Fix paragraph breaks in the middle of sentences
   // Look for patterns like: "word\n\nword" where it should be "word word"
   // But preserve intentional paragraph breaks (after periods, exclamation marks, etc.)
   cleaned = cleaned.replace(/([a-z,;:])\n\n([a-z])/g, '$1 $2');
-  
+
   // Fix single line breaks in the middle of sentences
   cleaned = cleaned.replace(/([a-z,;:])\n([a-z])/g, '$1 $2');
-  
+
   // Remove various forms of innovations/technologies listing at the end
   cleaned = cleaned.replace(/\n*\[?Innovations used:.*$/is, '');
   cleaned = cleaned.replace(/\n*Innovations used:.*$/is, '');
@@ -68,192 +68,249 @@ const cleanScenarioContent = (scenario) => {
   cleaned = cleaned.replace(/\n*Technologies used:.*$/is, '');
   cleaned = cleaned.replace(/\n*\[Educational innovations:.*$/is, '');
   cleaned = cleaned.replace(/\n*\[Technologies:.*$/is, '');
-  
+
   // Remove any trailing lists in brackets
   cleaned = cleaned.replace(/\n*\[.*?\]$/s, '');
-  
+
   // Clean up any trailing whitespace or multiple newlines
   cleaned = cleaned.trim().replace(/\n{3,}/g, '\n\n');
-  
+
   return cleaned;
 };
+
+// --- Randomized scenario spec -------------------------------------------------
+// All run-to-run variety is decided here in code and handed to the model as
+// requirements. The model cannot randomize on its own (and claude-sonnet-5
+// takes no temperature parameter), so this is the variation mechanism: with
+// ~6-8 options per dimension across seven dimensions, every generation gets a
+// combinatorially distinct brief.
+
+const pickRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
+const shuffle = (arr) => [...arr].sort(() => 0.5 - Math.random());
+
+const characterNames = {
+  'Algeria': ['Amina', 'Youssef', 'Fatima', 'Karim', 'Nour', 'Omar'],
+  'Ecuador': ['Sofia', 'Diego', 'Valentina', 'Carlos', 'Isabella', 'Andres'],
+  'France': ['Marie', 'Pierre', 'Camille', 'Lucas', 'Emma', 'Thomas'],
+  'Ghana': ['Akosua', 'Kwame', 'Ama', 'Kofi', 'Efua', 'Yaw'],
+  'Guinea-Bissau': ['Mariama', 'Baba', 'Fatou', 'Sekou', 'Aissatou', 'Mamadou'],
+  'Haiti': ['Marie-Claire', 'Jean-Pierre', 'Sylvie', 'Marc', 'Nathalie', 'Ronald'],
+  'India': ['Priya', 'Arjun', 'Kavya', 'Rohan', 'Ananya', 'Vikram'],
+  'Kazakhstan': ['Aida', 'Daniyar', 'Zarina', 'Nurbol', 'Aigerim', 'Askar'],
+  'Kenya': ['Wanjiku', 'Kipchoge', 'Akinyi', 'Otieno', 'Grace', 'Mwangi'],
+  'Madagascar': ['Rasoa', 'Andry', 'Voahangy', 'Tahina', 'Fara', 'Hery'],
+  'Mauritania': ['Fatimetou', 'Mohamed', 'Aminetou', 'Cheikh', 'Mariem', 'Sidi'],
+  'Norway': ['Ingrid', 'Erik', 'Astrid', 'Lars', 'Solveig', 'Magnus'],
+  'Philippines': ['Maria', 'Jose', 'Ana', 'Juan', 'Carmen', 'Pedro'],
+  'Senegal': ['Aissatou', 'Moussa', 'Fatou', 'Ibrahima', 'Khadija', 'Mamadou'],
+  'United States of America': ['Emma', 'James', 'Olivia', 'William', 'Sophia', 'Benjamin']
+};
+
+const genders = ['a girl', 'a boy', 'a non-binary young person'];
+
+const personalityTraits = [
+  'curious and methodical',
+  'restless, with a quick sense of humor',
+  'a quiet observer who notices what others miss',
+  'stubborn and determined',
+  'anxious but quietly brave',
+  'a playful daydreamer',
+  'practical, always fixing things',
+  'a natural organizer who pulls people together'
+];
+
+const familyCircumstances = [
+  'the eldest sibling, helping care for younger children',
+  'recently moved with their family from the countryside to a bigger town',
+  'living with a grandparent while a parent works far away',
+  'from a family that runs a small shop',
+  'from a farming family',
+  'the first in their family to study this far',
+  'part of a large multigenerational household',
+  'raised by a single parent who works long hours'
+];
+
+const settings = [
+  'a dense city neighborhood',
+  'a small rural village',
+  'a coastal community',
+  'a highland community',
+  'a mid-sized market town',
+  'a fast-growing settlement on the edge of a city',
+  'a farming community',
+  'a riverside community'
+];
+
+const narrativeFrames = [
+  'a day in the life, told hour by hour',
+  'a letter the character writes to a cousin living abroad',
+  'a moment when the new system falls short, and how the character and others work around it',
+  'a collaborative project with other students that comes to a head today',
+  'a conversation with a grandparent, comparing school then and now',
+  'an ordinary school morning interrupted by an unexpected discovery',
+  'the character teaching or helping someone else learn',
+  'a community gathering where the character presents something they made'
+];
+
+const stirdeeperLenses = {
+  SOCIAL: 'changes in how people interact, learn together, and build community',
+  ENVIRONMENTAL: 'climate impacts and sustainability in education',
+  POLITICAL: 'governance, policy, and power structures in education',
+  EDUCATIONAL: 'pedagogical approaches and learning methods',
+  ECONOMIC: 'new economic models for education and work',
+  TECHNOLOGICAL: 'technologies that enhance learning'
+};
+
+// Pick exactly the innovations the scenario must use. Research mode anchors on
+// the region's own Youth Foresight scan hit; remaining picks come from distinct
+// categories, with tech-centric categories capped at one per scenario so the
+// mix doesn't collapse into AI + VR every time.
+const pickInnovations = (timeFrame, useExistingScenario, regional) => {
+  const total = timeFrame === '2035' ? 2 : 3;
+  const innovations = [];
+  if (useExistingScenario && regional && regional.scanHit) {
+    innovations.push(regional.scanHit);
+  }
+  let techUsed = 0;
+  for (const category of shuffle(Object.keys(globalScanHitCategories))) {
+    if (innovations.length >= total) break;
+    const isTech = techCategories.includes(category);
+    if (isTech && techUsed >= 1) continue;
+    innovations.push(pickRandom(globalScanHitCategories[category]));
+    if (isTech) techUsed += 1;
+  }
+  return innovations;
+};
+
+// Two STIRDEEPER lenses per scenario, weighted away from TECHNOLOGICAL.
+const pickLenses = () => {
+  const lenses = shuffle(Object.keys(stirdeeperLenses).filter(l => l !== 'TECHNOLOGICAL')).slice(0, 2);
+  if (Math.random() < 0.2) {
+    lenses[1] = 'TECHNOLOGICAL';
+  }
+  return lenses;
+};
+
+// --- Recent-scenario memory ---------------------------------------------------
+// Titles of recent generations are fed back into the prompt so the model can
+// actively avoid repeating premises across generations (it has no memory of
+// its own previous outputs).
+const RECENT_TITLES_KEY = 'uwb_recent_scenario_titles';
+
+const getRecentTitles = () => {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return [];
+    return JSON.parse(window.localStorage.getItem(RECENT_TITLES_KEY)) || [];
+  } catch (e) {
+    return [];
+  }
+};
+
+export const recordScenarioTitle = (title) => {
+  try {
+    if (!title || typeof window === 'undefined' || !window.localStorage) return;
+    const titles = [title, ...getRecentTitles().filter(t => t !== title)].slice(0, 8);
+    window.localStorage.setItem(RECENT_TITLES_KEY, JSON.stringify(titles));
+  } catch (e) {
+    // non-essential; ignore storage failures
+  }
+};
+
+// Stable instructions shared by every request — sent as the system prompt.
+const buildSystemPrompt = () => `You are a scenario writer for UNICEF's Young Visionaries World Builder, creating imaginative future-of-education stories used in workshops with young people.
+
+${getAllSafetyInstructions()}
+
+OUTPUT FORMAT:
+- First line: a title in the exact format given in the request
+- Then a blank line, then the scenario as flowing prose paragraphs
+- Do not append lists of technologies or innovations, and add no meta-commentary before or after the story`;
 
 export const generatePrompt = (selectedRegion, timeFrame, learnerAge, useExistingScenario, customDirection) => {
   // Sanitize user inputs before processing
   const sanitizedCustomDirection = customDirection ? sanitizeUserInput(customDirection).sanitized : '';
-  
+
   const regional = regionalInsights[selectedRegion];
   const guidance = timeFrameGuidance[timeFrame];
   const ageContext = getAgeContext(learnerAge);
 
-  // Add timestamp and random elements for uniqueness
-  const timestamp = Date.now();
-  const randomSeed = Math.floor(Math.random() * 10000);
-  
-  // Select a different random subset of scan hits each time (40-70 innovations)
-  const numInnovations = 40 + Math.floor(Math.random() * 31); // Random between 40-70
-  const shuffledScanHits = [...globalScanHits].sort(() => 0.5 - Math.random());
-  const selectedScanHits = shuffledScanHits.slice(0, numInnovations);
-  
-  // Random scenario elements for variety
-  const scenarioTypes = [
-    'a day in the life', 'a transformative moment', 'a collaborative project', 
-    'a challenge overcome', 'an unexpected discovery', 'a community initiative'
-  ];
-  const randomScenarioType = scenarioTypes[Math.floor(Math.random() * scenarioTypes.length)];
-  
-  const characterNames = {
-    'Algeria': ['Amina', 'Youssef', 'Fatima', 'Karim', 'Nour', 'Omar'],
-    'Ecuador': ['Sofia', 'Diego', 'Valentina', 'Carlos', 'Isabella', 'Andres'],
-    'France': ['Marie', 'Pierre', 'Camille', 'Lucas', 'Emma', 'Thomas'],
-    'Ghana': ['Akosua', 'Kwame', 'Ama', 'Kofi', 'Efua', 'Yaw'],
-    'Guinea-Bissau': ['Mariama', 'Baba', 'Fatou', 'Sekou', 'Aissatou', 'Mamadou'],
-    'Haiti': ['Marie-Claire', 'Jean-Pierre', 'Sylvie', 'Marc', 'Nathalie', 'Ronald'],
-    'India': ['Priya', 'Arjun', 'Kavya', 'Rohan', 'Ananya', 'Vikram'],
-    'Kazakhstan': ['Aida', 'Daniyar', 'Zarina', 'Nurbol', 'Aigerim', 'Askar'],
-    'Kenya': ['Wanjiku', 'Kipchoge', 'Akinyi', 'Otieno', 'Grace', 'Mwangi'],
-    'Madagascar': ['Rasoa', 'Andry', 'Voahangy', 'Tahina', 'Fara', 'Hery'],
-    'Mauritania': ['Fatimetou', 'Mohamed', 'Aminetou', 'Cheikh', 'Mariem', 'Sidi'],
-    'Norway': ['Ingrid', 'Erik', 'Astrid', 'Lars', 'Solveig', 'Magnus'],
-    'Philippines': ['Maria', 'Jose', 'Ana', 'Juan', 'Carmen', 'Pedro'],
-    'Senegal': ['Aissatou', 'Moussa', 'Fatou', 'Ibrahima', 'Khadija', 'Mamadou'],
-    'United States of America': ['Emma', 'James', 'Olivia', 'William', 'Sophia', 'Benjamin']
-  };
+  // The randomized brief: character, setting, story shape, lenses, innovations.
+  // Name lists alternate feminine/masculine (even/odd indices), so pick the
+  // gender first and draw the name from a matching pool; non-binary characters
+  // can carry any name. The fallback names are unisex.
   const regionNames = characterNames[selectedRegion] || ['Alex', 'Sam', 'Jordan', 'Taylor', 'Casey', 'Riley'];
-  const randomName = regionNames[Math.floor(Math.random() * regionNames.length)];
+  const gender = pickRandom(genders);
+  const namePool = characterNames[selectedRegion]
+    ? (gender === 'a girl' ? regionNames.filter((_, i) => i % 2 === 0)
+      : gender === 'a boy' ? regionNames.filter((_, i) => i % 2 === 1)
+      : regionNames)
+    : regionNames;
+  const age = learnerAge || (8 + Math.floor(Math.random() * 10));
+  const spec = {
+    name: pickRandom(namePool),
+    gender,
+    trait: pickRandom(personalityTraits),
+    circumstance: pickRandom(familyCircumstances),
+    setting: pickRandom(settings),
+    frame: pickRandom(narrativeFrames),
+    lenses: pickLenses(),
+    innovations: pickInnovations(timeFrame, useExistingScenario, regional)
+  };
+  const recentTitles = getRecentTitles();
 
-  const prompt = `${getAllSafetyInstructions()}
+  const user = `Write one education-futures scenario following this brief.
 
-CREATIVITY & UNIQUENESS REQUIREMENT: This is generation #${randomSeed} at ${timestamp}. Create a COMPLETELY UNIQUE scenario that is different from any previous generation. Be creative, unexpected, and original!
+SCENARIO BRIEF
+- Region: ${selectedRegion}
+- Year: ${timeFrame}
+- Main character: ${spec.name}, ${spec.gender}, exactly ${age} years old — ${spec.trait}; ${spec.circumstance}
+- Setting: ${spec.setting} in ${selectedRegion} (adapt the setting so it is authentic to the region)
+- Narrative frame: tell it as ${spec.frame}
+- Emphasize these two STIRDEEPER lenses above all others:
+${spec.lenses.map(l => `  • ${l}: ${stirdeeperLenses[l]}`).join('\n')}
 
-MANDATORY REQUIREMENT: The main character in this scenario MUST be exactly ${learnerAge || 'a randomly chosen'} years old. Do NOT use age 15 or any other age. Use ${learnerAge || 'the chosen age'} throughout the entire scenario.
+${useExistingScenario ? `RESEARCH FOUNDATION (from UNICEF's Youth Foresight Fellows in ${selectedRegion} — this is the heart of the scenario):
+- Theme: ${regional.theme}
+- Current challenges: ${regional.currentChallenges}
+- The fellows' preferred future: ${regional.preferredFuture}
 
-SCENARIO FOCUS: Create ${randomScenarioType} story featuring ${randomName}, a ${learnerAge || 'chosen age'}-year-old student in ${selectedRegion}.
+The story's central tension must grow out of these challenges, and its resolution must reflect the fellows' preferred future. The first required innovation below is the fellows' own focus area — keep it central to the story.` : `FRESH SCENARIO: Build the scenario from your own knowledge of ${selectedRegion} — its educational system, languages, culture, geography, economy, and current challenges — so it feels authentic to the region rather than generic.`}
 
-${useExistingScenario ? `
-You are helping create an imaginative education scenario for ${timeFrame} based on UNICEF's Youth Foresight Fellows research.
-
-CONTEXT: Young people from ${selectedRegion} have identified key challenges and visions for education futures through the Young Visionaries project.
-
-REGIONAL INSIGHTS FOR ${selectedRegion} (from Youth Foresight Fellows research):
-- Current Theme: ${regional.theme}
-- Key Challenges: ${regional.currentChallenges}  
-- Preferred Future Vision: ${regional.preferredFuture}
-- Regional Focus Area: ${regional.scanHit}
-` : `
-You are helping create a completely fresh, imaginative education scenario for ${timeFrame} using your knowledge of ${selectedRegion}'s educational context, cultural factors, socioeconomic conditions, and current challenges.
-
-FRESH SCENARIO APPROACH FOR ${selectedRegion}:
-- Use your understanding of ${selectedRegion}'s educational system, culture, and context
-- Consider region-specific challenges like infrastructure, language, economic factors, and social dynamics
-- Ensure the scenario feels authentic to ${selectedRegion}'s educational and cultural environment
-- Focus on what YOU determine is most appropriate for ${selectedRegion} given the ${timeFrame} timeframe and ${learnerAge ? `age ${learnerAge}` : 'chosen age'} student
-- Focus entirely on your own knowledge and understanding of the region
-- Draw inspiration from the available innovations below to create something uniquely suited to ${selectedRegion}'s context
-`}
-
-CHARACTER REQUIREMENTS (CRITICAL):
-${learnerAge ? `- Main character name: ${randomName}, age: EXACTLY ${learnerAge} years old (NOT 15, NOT any other age)` : `- Main character name: ${randomName}, choose a specific age between 8-17 and state it clearly`}
-- Gender: Randomly select male, female, or non-binary (do not default to female)
-- Make the character feel authentic to ${selectedRegion}
-- Give the character unique personality traits, interests, and background
-
-${ageContext ? `
-EDUCATIONAL CONTEXT FOR AGE ${learnerAge}:
-- Educational Level: ${ageContext.level}
-- Learning Focus: ${ageContext.focus}
-- Key Considerations: ${ageContext.considerations}
-` : ''}
-
-TIME FRAME GUIDANCE - ${guidance.novelty} (${timeFrame}):
+TIME FRAME — ${guidance.novelty} (${timeFrame}):
 ${guidance.description}
+${guidance.constraints}
+Register to aim for: ${guidance.examples}
 
-NOVELTY REQUIREMENTS FOR ${timeFrame}:
-${timeFrame === '2035' ? `
-- Use 3-4 scan hits that represent realistic near-term breakthroughs
-- Show incremental but meaningful changes to current educational systems
-- Include emerging technologies that are already in development
-- Focus on policy and infrastructure improvements that could realistically happen
-- Be optimistic but grounded in current technological trajectories
-` : timeFrame === '2045' ? `
-- Use 4-6 scan hits including some truly surprising developments
-- Include breakthrough technologies that seem hard to imagine today
-- Show significant social and educational paradigm shifts
-- Include "wild card" elements that push boundaries of possibility
-- Combine multiple innovations in unexpected ways
-- Create genuine "wow" moments that feel futuristic but believable
-` : `
-- Use 5-8 scan hits to create a genuinely transformed educational landscape
-- Include multiple breakthrough technologies that seem almost science fiction
-- Show radical social changes and completely new educational paradigms
-- Include genuine "wild card" elements and unexpected developments
-- Push the boundaries while keeping scenarios theoretically possible
-- Create scenarios that feel like windows into a completely transformed world
-- Be bold, imaginative, and genuinely surprising
-`}
+REQUIRED INNOVATIONS — build the story around exactly these ${spec.innovations.length}, no others:
+${spec.innovations.map(hit => `• ${hit}`).join('\n')}
+Weave each one concretely into ${spec.name}'s story — show it working in daily life, give it a one-sentence backstory, and show a consequence — rather than name-dropping it.
+${ageContext ? `
+EDUCATIONAL CONTEXT FOR AGE ${age}:
+- Educational level: ${ageContext.level}
+- Learning focus: ${ageContext.focus}
+- Key considerations: ${ageContext.considerations}
+` : ''}${recentTitles.length ? `
+RECENTLY GENERATED SCENARIOS — do not repeat their premises, settings, or central ideas:
+${recentTitles.map(t => `- ${t}`).join('\n')}
+` : ''}${sanitizedCustomDirection ? `
+USER DIRECTION: ${sanitizedCustomDirection}
+` : ''}
+Length: 400-450 words.
 
-AVAILABLE EDUCATIONAL INNOVATIONS TO DRAW FROM:
-MANDATORY: Select and weave in ${timeFrame === '2035' ? '3-4' : timeFrame === '2045' ? '4-6' : '5-8'} of these innovations that fit your scenario:
+Start your response with a title on the first line in this exact format:
+${selectedRegion}, ${timeFrame}, Age ${age}, [Short evocative title that captures the gist of the scenario]
 
-${selectedScanHits.map(hit => `• ${hit}`).join('\n')}
-
-INNOVATION INTEGRATION REQUIREMENTS:
-- MUST use the specified number of scan hits as core elements of your scenario
-- Combine innovations in unexpected and creative ways
-- Show how multiple technologies/approaches work together
-- Make the innovations feel natural and integral to the story
-- Demonstrate the transformative impact of these educational changes
-- Be specific about how each innovation actually works in practice
-
-CREATIVITY & NOVELTY INSTRUCTIONS:
-- Create a genuinely SURPRISING story that pushes educational boundaries
-- Include breakthrough moments that feel truly futuristic for ${timeFrame}
-- Use unexpected plot twists and discoveries that showcase innovation
-- Make the scenario emotionally engaging and memorable
-- Include specific, vivid details that bring futuristic education to life
-- Show radical departures from today's educational norms
-- Focus on the transformative human impact of educational innovation
-- Create "wow" moments that demonstrate the power of future learning
-
-STIRDEEPER FOCUS INSTRUCTIONS:
-Focus deeply on just 2-3 STIRDEEPER categories (choose different ones than typical):
-- SOCIAL: Changes in how people interact, learn together, and build community
-- ENVIRONMENTAL: Climate impacts and sustainability in education
-- POLITICAL: Governance, policy, and power structures in education
-- EDUCATIONAL: Pedagogical approaches and learning methods
-- ECONOMIC: New economic models for education and work
-- TECHNOLOGICAL: Innovations that enhance learning (use sparingly)
-
-STORY STRUCTURE VARIETY:
-- Start with an unexpected situation or challenge
-- Include dialogue and personal interactions
-- Show the character's emotions and growth
-- End with a meaningful resolution or new beginning
-
-${useExistingScenario ? `START WITH: Use the existing Young Visionaries scenario vision from ${selectedRegion} as your foundation, but project it forward to ${timeFrame} incorporating relevant innovations from the list above.` : `CREATE NEW: Generate a completely fresh scenario for ${selectedRegion} in ${timeFrame} using your knowledge of the region. Rely entirely on your understanding of ${selectedRegion}'s educational context, challenges, and opportunities.`}
-
-${sanitizedCustomDirection ? `USER DIRECTION: ${sanitizedCustomDirection}` : ''}
-
-FINAL REMINDER: Your main character must be ${learnerAge ? `${learnerAge} years old` : 'the specific age you choose'} - verify this before writing.
-
-Please create a scenario (250-300 words) featuring a ${learnerAge ? `${learnerAge}-year-old` : '[specify age]'} student in ${selectedRegion}, ${timeFrame}.
-
-IMPORTANT: Start your response with a title on the first line in this exact format:
-${selectedRegion}, ${timeFrame}, Age ${learnerAge || '[age]'}, [Short clever title that captures the gist of the scenario]
-
-Then leave a blank line, then provide the scenario text.`;
+Then leave a blank line, then the scenario text.`;
 
   // Debug logging
   console.log('=== PROMPT DEBUG ===');
-  console.log('useExistingScenario:', useExistingScenario);
-  console.log('selectedRegion:', selectedRegion);
   console.log('Mode:', useExistingScenario ? 'Young Visionaries Research' : 'Fresh Scenario');
-  console.log('Prompt length:', prompt.length);
-  console.log('Contains UNICEF research:', prompt.includes('UNICEF'));
-  console.log('Contains Young Visionaries:', prompt.includes('Young Visionaries'));
+  console.log('Spec:', spec);
+  console.log('Recent titles fed back:', recentTitles.length);
+  console.log('Prompt length:', user.length);
   console.log('=== END DEBUG ===');
 
-  return prompt;
+  return { system: buildSystemPrompt(), user };
 };
 
 // Helper function to extract character name from scenario
@@ -264,7 +321,7 @@ const extractCharacterName = (scenario) => {
     /([A-Z][a-z]+),?\s+(?:an?\s+)?(\d+)-year-old/i,
     /([A-Z][a-z]+)\s+(?:in|from|at|experiences)/i
   ];
-  
+
   for (const pattern of namePatterns) {
     const match = scenario.match(pattern);
     if (match) {
@@ -272,7 +329,7 @@ const extractCharacterName = (scenario) => {
       return match[1].match(/^[A-Z][a-z]+$/) ? match[1] : match[2];
     }
   }
-  
+
   // Fallback: look for any capitalized name at the beginning of a sentence
   const fallbackMatch = scenario.match(/(?:^|\. )([A-Z][a-z]+)(?:'s|\s)/);
   return fallbackMatch ? fallbackMatch[1] : null;
@@ -283,18 +340,18 @@ const extractScenarioSetting = (scenario) => {
   // Look for quoted titles or distinctive settings
   const titleMatch = scenario.match(/"([^"]+)"/);
   if (titleMatch) return titleMatch[1];
-  
+
   // Look for distinctive setting descriptions
   const settingPatterns = [
     /(?:floating|mobile|virtual|digital|sacred|innovative)\s+(?:classroom|school|learning|education)/i,
     /(?:aboard|in|at)\s+(?:one of|the)\s+([^.]+?)(?:\s+[–-]|\.|,)/i
   ];
-  
+
   for (const pattern of settingPatterns) {
     const match = scenario.match(pattern);
     if (match) return match[0].trim();
   }
-  
+
   return null;
 };
 
@@ -304,22 +361,22 @@ export const generateRegeneratePrompt = (selectedRegion, timeFrame, learnerAge, 
     liked: feedback.liked ? sanitizeUserInput(feedback.liked).sanitized : '',
     disliked: feedback.disliked ? sanitizeUserInput(feedback.disliked).sanitized : ''
   };
-  
+
   const regional = regionalInsights[selectedRegion];
-  
+
   // Extract core elements from the original scenario to preserve them
   const originalCharacterName = extractCharacterName(generatedScenario);
   const originalSetting = extractScenarioSetting(generatedScenario);
-  
+
   // Only select educational innovations that could address the specific feedback
   // Focus on innovations related to what the user wants to change
   const feedbackKeywords = (feedback.disliked || '').toLowerCase();
   let relevantInnovations = [];
-  
+
   if (feedbackKeywords.includes('stirdeeper') || feedbackKeywords.includes('social') || feedbackKeywords.includes('political') || feedbackKeywords.includes('environmental')) {
-    relevantInnovations = globalScanHits.filter(hit => 
-      hit.toLowerCase().includes('social') || 
-      hit.toLowerCase().includes('political') || 
+    relevantInnovations = globalScanHits.filter(hit =>
+      hit.toLowerCase().includes('social') ||
+      hit.toLowerCase().includes('political') ||
       hit.toLowerCase().includes('environmental') ||
       hit.toLowerCase().includes('governance') ||
       hit.toLowerCase().includes('community') ||
@@ -330,15 +387,13 @@ export const generateRegeneratePrompt = (selectedRegion, timeFrame, learnerAge, 
     );
   } else {
     // If no specific feedback, select a broader range but still focused
-    relevantInnovations = globalScanHits.slice(0, 30);
+    relevantInnovations = shuffle(globalScanHits).slice(0, 30);
   }
-  
-  // Limit to 10-15 most relevant innovations to keep focused
+
+  // Limit to a focused set of the most relevant innovations
   const selectedInnovations = relevantInnovations.slice(0, 15);
 
-  const prompt = `${getAllSafetyInstructions()}
-
-SCENARIO REFINEMENT REQUEST: Improve and enhance the existing scenario based on user feedback while preserving the core story elements.
+  const user = `SCENARIO REFINEMENT REQUEST: Improve and enhance the existing scenario based on user feedback while preserving the core story elements.
 
 REFINEMENT OBJECTIVE: Take the existing scenario and enhance it by addressing the user's specific feedback while maintaining the same character, setting, and basic storyline structure.
 
@@ -349,7 +404,7 @@ USER FEEDBACK FOR IMPROVEMENT:
 What they liked: ${sanitizedFeedback.liked || 'No specific feedback provided'}
 What they want enhanced/added: ${sanitizedFeedback.disliked || 'No specific changes requested'}
 
-MANDATORY PRESERVATION REQUIREMENTS:
+PRESERVATION REQUIREMENTS:
 - Keep the same character: ${originalCharacterName || 'the original character'} (age ${learnerAge})
 - Maintain the same setting: ${originalSetting || 'the same educational environment'}
 - Preserve the core storyline structure and basic plot
@@ -358,16 +413,16 @@ MANDATORY PRESERVATION REQUIREMENTS:
 ${existingTitle ? `- Keep the same title: "${existingTitle}"` : ''}
 
 REFINEMENT INSTRUCTIONS:
-1. ENHANCE, don't replace: Build upon the existing scenario rather than creating something new
-2. ADDRESS FEEDBACK: Specifically add or improve the elements the user requested
-3. PRESERVE CORE: Keep the character name, setting, and main story beats
-4. EXPAND DETAILS: Add more depth, dialogue, and specific examples where needed
-5. MAINTAIN AUTHENTICITY: Keep the regional and cultural context consistent
+1. Enhance, don't replace: build upon the existing scenario rather than creating something new
+2. Address feedback: specifically add or improve the elements the user requested
+3. Preserve the core: keep the character name, setting, and main story beats
+4. Expand details: add more depth, dialogue, and specific examples where needed
+5. Maintain authenticity: keep the regional and cultural context consistent, and keep the futures-craft principles (traceable change, continuity, friction, second-order effects)
 
 ${useExistingScenario ? `
 REGIONAL CONTEXT (Youth Foresight Fellows research for ${selectedRegion}):
 - Theme: ${regional.theme}
-- Challenges: ${regional.currentChallenges}  
+- Challenges: ${regional.currentChallenges}
 - Vision: ${regional.preferredFuture}
 - Focus: ${regional.scanHit}
 
@@ -378,35 +433,30 @@ Use your knowledge of ${selectedRegion}'s educational, cultural, and socioeconom
 `}
 
 ENHANCEMENT OPPORTUNITIES:
-Based on the user feedback, incorporate these relevant educational innovations to address their concerns while maintaining futuristic novelty:
+If (and only if) it helps address the user's feedback, you may weave in 1-2 of these innovations:
 
 ${selectedInnovations.map(innovation => `• ${innovation}`).join('\n')}
 
-INNOVATION ENHANCEMENT REQUIREMENTS:
-- Add 2-3 additional scan hits that address the user's feedback
-- Maintain the futuristic, innovative feel of the original scenario
-- Show how new innovations enhance rather than replace existing elements
-- Demonstrate breakthrough approaches that feel genuinely advanced for ${timeFrame}
-- Keep the "wow" factor while addressing specific user requests
+Show any added innovation working concretely in the story — with a brief backstory and a consequence — rather than name-dropping it.
 
 SPECIFIC ENHANCEMENT GUIDELINES:
-- If user wants more "STIRDEEPER representation": Add more Social, Political, Environmental, or Economic dimensions
-- If user wants more dialogue: Add conversations between characters
-- If user wants more detail: Expand on the educational innovations and how they work
-- If user wants more emotion: Add character feelings, reactions, and personal growth moments
-- If user wants different focus: Shift emphasis while keeping the same basic story
+- If user wants more "STIRDEEPER representation": add more Social, Political, Environmental, or Economic dimensions
+- If user wants more dialogue: add conversations between characters
+- If user wants more detail: expand on the educational innovations and how they work
+- If user wants more emotion: add character feelings, reactions, and personal growth moments
+- If user wants different focus: shift emphasis while keeping the same basic story
 
 REFINED SCENARIO REQUIREMENTS:
 - Same character (${originalCharacterName || 'original character'}) at age ${learnerAge}
 - Same setting (${originalSetting || 'original setting'})
 - Enhanced based on feedback: "${sanitizedFeedback.disliked || 'general improvements'}"
 - Preserve what they liked: "${sanitizedFeedback.liked || 'existing elements'}"
-- 250-300 words with richer detail and better alignment with user preferences
+- 400-450 words with richer detail and better alignment with user preferences
 - Maintain regional authenticity for ${selectedRegion}
 
 Create a refined and improved version of the SAME scenario that addresses the user's feedback while preserving the core story elements they already have.
 
-IMPORTANT: Start your response with a title on the first line. ${existingTitle ? `Use the existing title: "${existingTitle}"` : `Create a title in this format: ${selectedRegion}, ${timeFrame}, Age ${learnerAge || '[age]'}, [Short clever title that captures the gist of the scenario]`}
+Start your response with a title on the first line. ${existingTitle ? `Use the existing title: "${existingTitle}"` : `Create a title in this format: ${selectedRegion}, ${timeFrame}, Age ${learnerAge || '[age]'}, [Short evocative title that captures the gist of the scenario]`}
 
 Then leave a blank line, then provide the refined scenario text.`;
 
@@ -419,35 +469,39 @@ Then leave a blank line, then provide the refined scenario text.`;
   console.log('feedbackKeywords:', feedbackKeywords);
   console.log('relevantInnovations count:', relevantInnovations.length);
   console.log('Mode: REFINEMENT (not new generation)');
-  console.log('Prompt length:', prompt.length);
+  console.log('Prompt length:', user.length);
   console.log('=== END REGENERATION DEBUG ===');
 
-  return prompt;
+  return { system: buildSystemPrompt(), user };
 };
 
-export const callClaudeAPI = async (prompt, selectedRegion, timeFrame) => {
+export const callClaudeAPI = async (promptParts, selectedRegion, timeFrame) => {
   // All API calls go through the server proxy which handles API key authentication
-  // Client-side code does not need access to the API key for security reasons
-  
+  // Client-side code does not need access to the API key for security reasons.
+  // Accepts either a plain prompt string or { system, user } parts.
+  const { user: prompt, system } = typeof promptParts === 'string'
+    ? { user: promptParts, system: undefined }
+    : promptParts;
+
   try {
     // Use the proxy server instead of calling the API directly
     // In development, use the full URL to the Express server
-    const apiUrl = process.env.NODE_ENV === 'development' 
+    const apiUrl = process.env.NODE_ENV === 'development'
       ? 'http://localhost:3001/api/generate-scenario'
       : '/api/generate-scenario';
-    
+
     const response = await fetch(apiUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ prompt })
+      body: JSON.stringify({ prompt, system })
     });
 
     if (!response.ok) {
       const errorData = await response.json();
       console.error('Server error:', errorData);
-      
+
       // If server returns API key error, fall back to demo mode
       if (errorData.error && errorData.error.includes('API key not configured')) {
         console.log('Falling back to demo mode due to server API key error');
@@ -458,18 +512,21 @@ export const callClaudeAPI = async (prompt, selectedRegion, timeFrame) => {
         }
         return { title: null, scenario: `Demo scenario for ${selectedRegion} in ${timeFrame}. Server API key not configured.\n\n[Demo Mode: Configure API key on server for custom scenarios.]` };
       }
-      
+
       throw new Error(errorData.error || `API request failed: ${response.status}`);
     }
 
     const data = await response.json();
     const cleaned = cleanScenarioContent(data.scenario);
     const { title, scenario } = extractTitleAndScenario(cleaned);
-    
+
+    // Remember this title so future generations can avoid repeating its premise
+    if (title) recordScenarioTitle(title);
+
     return { title, scenario };
   } catch (error) {
     console.error('Error calling Claude API:', error);
-    
+
     // Fall back to demo mode on any error
     console.log('Falling back to demo mode due to error');
     const demoScenario = getDemoScenario(selectedRegion, timeFrame);
