@@ -47,36 +47,46 @@ One of Priya's most powerful experiences is participating in the school's social
 
 // API proxy endpoint
 app.post('/api/generate-scenario', async (req, res) => {
-  try {
-    const { prompt, system } = req.body;
-    
-    // Check if API key is configured
-    if (!process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY === 'your_api_key_here') {
-      // Return demo scenario instead of error
-      console.log('No API key configured, returning demo scenario');
-      
-      // Try to extract region and time frame from prompt for demo scenario
-      let demoScenario = null;
-      if (prompt.includes('Algeria') && prompt.includes('2035')) {
-        demoScenario = demoScenarios['Algeria-2035'];
-      } else if (prompt.includes('Kenya') && prompt.includes('2045')) {
-        demoScenario = demoScenarios['Kenya-2045'];
-      } else if (prompt.includes('India') && prompt.includes('2055')) {
-        demoScenario = demoScenarios['India-2055'];
-      }
-      
-      if (demoScenario) {
-        return res.json({ 
-          scenario: demoScenario + '\n\n[Demo Mode: Server API key not configured. This is a sample scenario.]' 
-        });
-      }
-      
-      // Fallback demo message
-      return res.json({ 
-        scenario: `This is a demo scenario. To generate custom scenarios, please configure your Anthropic API key in the .env file.\n\n[Demo Mode: Server API key not configured.]` 
+  const { prompt, system } = req.body;
+
+  // Check if API key is configured
+  if (!process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY === 'your_api_key_here') {
+    // Return demo scenario instead of error
+    console.log('No API key configured, returning demo scenario');
+
+    // Try to extract region and time frame from prompt for demo scenario
+    let demoScenario = null;
+    if (prompt.includes('Algeria') && prompt.includes('2035')) {
+      demoScenario = demoScenarios['Algeria-2035'];
+    } else if (prompt.includes('Kenya') && prompt.includes('2045')) {
+      demoScenario = demoScenarios['Kenya-2045'];
+    } else if (prompt.includes('India') && prompt.includes('2055')) {
+      demoScenario = demoScenarios['India-2055'];
+    }
+
+    if (demoScenario) {
+      return res.json({
+        scenario: demoScenario + '\n\n[Demo Mode: Server API key not configured. This is a sample scenario.]'
       });
     }
 
+    // Fallback demo message
+    return res.json({
+      scenario: `This is a demo scenario. To generate custom scenarios, please configure your Anthropic API key in the .env file.\n\n[Demo Mode: Server API key not configured.]`
+    });
+  }
+
+  // Heroku's router kills any request with no response bytes within 30s (H12),
+  // and generation regularly takes longer than that. Send whitespace heartbeats
+  // while we wait — leading whitespace is valid JSON, so the client's
+  // response.json() still parses the final payload. This also means errors
+  // after this point are delivered as { error } in a 200 body; the client
+  // checks for that field.
+  res.setHeader('Content-Type', 'application/json');
+  res.write(' ');
+  const heartbeat = setInterval(() => res.write(' '), 10000);
+
+  try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -89,6 +99,9 @@ app.post('/api/generate-scenario', async (req, res) => {
         // claude-sonnet-5's adaptive thinking counts against max_tokens, so
         // leave headroom beyond the ~450-word scenario itself
         max_tokens: 4000,
+        // A well-specified 450-word story doesn't need deep reasoning; medium
+        // effort cuts thinking time (and latency) with comparable quality
+        output_config: { effort: "medium" },
         ...(system ? { system } : {}),
         messages: [
           { role: "user", content: prompt }
@@ -103,28 +116,30 @@ app.post('/api/generate-scenario', async (req, res) => {
     }
 
     const data = await response.json();
-    
-    // Handle different response structures.
+
     // claude-sonnet-5 responses can begin with a thinking block, so find the
     // first text block rather than assuming content[0] is it.
-    if (data.content && Array.isArray(data.content) && data.content.length > 0) {
+    let scenarioText = '';
+    if (data.content && Array.isArray(data.content)) {
       const textBlock = data.content.find(block => block.type === 'text' && block.text);
-      const scenarioText = textBlock ? textBlock.text : '';
-      if (!scenarioText) {
-        console.error('No text block in API response. stop_reason:', data.stop_reason, 'blocks:', data.content.map(b => b.type));
-        throw new Error(`Claude API returned no text (stop_reason: ${data.stop_reason})`);
-      }
-      res.json({ scenario: scenarioText });
+      scenarioText = textBlock ? textBlock.text : '';
     } else if (data.text) {
-      res.json({ scenario: data.text });
-    } else {
-      console.error('Unexpected API response structure:', JSON.stringify(data));
-      throw new Error('Unexpected response structure from Claude API');
+      scenarioText = data.text;
     }
+
+    if (!scenarioText) {
+      console.error('No text in API response. stop_reason:', data.stop_reason, 'body:', JSON.stringify(data).slice(0, 500));
+      throw new Error(`Claude API returned no text (stop_reason: ${data.stop_reason})`);
+    }
+
+    clearInterval(heartbeat);
+    res.end(JSON.stringify({ scenario: scenarioText }));
   } catch (error) {
     console.error('Error calling Claude API:', error.message);
     console.error('Error stack:', error.stack);
-    res.status(500).json({ error: 'Failed to generate scenario', details: error.message });
+    clearInterval(heartbeat);
+    // Headers already sent (heartbeat), so deliver the error in the body
+    res.end(JSON.stringify({ error: 'Failed to generate scenario', details: error.message }));
   }
 });
 

@@ -522,6 +522,14 @@ export const callClaudeAPI = async (promptParts, selectedRegion, timeFrame) => {
     }
 
     const data = await response.json();
+
+    // The server streams heartbeat whitespace before the JSON body (to survive
+    // Heroku's 30s router timeout), so errors after that point arrive as an
+    // { error } field in a 200 response rather than a non-OK status.
+    if (data.error) {
+      throw new Error(data.details || data.error);
+    }
+
     const cleaned = cleanScenarioContent(data.scenario);
     const { title, scenario } = extractTitleAndScenario(cleaned);
 
